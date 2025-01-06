@@ -1,43 +1,7 @@
 import pandas as pd
 import os
 
-def generate_renko_org(data, brick_size):
-    renko_data = []
-    actual_openprice = []
-    renko_timestamps = []
-    ticks_moved = []  # To store the number of ticks moved per brick
-    directions = []
-    fx_returns = []
-    open_prices = data['open'].values
-    timestamps = data.index.values
-    current_price = open_prices[0]
-
-    for i in range(1, len(open_prices)):
-        price = open_prices[i]
-        # Calculate total ticks moved for this price update
-        total_ticks = int(abs(price - current_price) // brick_size)  # Calculate number of full bricks
-        while abs(price - current_price) >= brick_size:
-            if price > current_price:
-                current_price += brick_size
-                renko_data.append(current_price)
-                actual_openprice.append(price)
-                renko_timestamps.append(timestamps[i])
-                ticks_moved.append(total_ticks)
-                directions.append("+1")                
-            elif price < current_price:
-                current_price -= brick_size
-                renko_data.append(current_price)
-                actual_openprice.append(price)
-                renko_timestamps.append(timestamps[i])
-                ticks_moved.append(total_ticks)
-                directions.append("-1")
-    
-    # Convert actual_openprice to a pandas Series to calculate pct_change
-    actual_openprice_series = pd.Series(actual_openprice)
-    fx_returns = actual_openprice_series.pct_change() * 100  # Percentage change
-    return renko_data, actual_openprice, renko_timestamps, ticks_moved, directions, fx_returns
-
-def generate_renko(data, brick_size):
+def generate_renko_base_first_price(data, brick_size):
     # Initialize variables
     renko_data = []
     actual_openprice = []
@@ -79,9 +43,56 @@ def generate_renko(data, brick_size):
 
     return renko_data, actual_openprice, renko_timestamps, ticks_moved, directions, fx_returns
 
+def generate_renko_base_prev_price(data, brick_size):
+    # Initialize variables
+    renko_data = []
+    actual_openprice = []
+    renko_timestamps = []
+    ticks_moved = []
+    directions = []
+    fx_returns = []
+
+    # Extract prices and timestamps
+    open_prices = data['open'].values
+    timestamps = data.index.values
+
+    # Start with the first price
+    current_price = open_prices[0]
+
+    for i in range(1, len(open_prices)):
+        # Use the last Renko price as the base, or open_prices[0] for the first iteration
+        base_price = renko_data[-1] if renko_data else open_prices[0]
+        target_price = open_prices[i]
+        timestamp = timestamps[i]
+
+        # Calculate price difference
+        price_diff = target_price - base_price
+        total_ticks = int(abs(price_diff) // brick_size)
+
+        # Form Renko bricks if significant price movement occurs
+        for j in range(total_ticks):
+            # Update current_price based on direction
+            direction = 1 if price_diff > 0 else -1
+            current_price = base_price + direction * brick_size * (j + 1)
+
+            # Append Renko brick details
+            renko_data.append(current_price)
+            actual_openprice.append(target_price)
+            renko_timestamps.append(timestamp if j == total_ticks - 1 else f"{timestamp}_brick_{j+1}")
+            ticks_moved.append(total_ticks)
+            directions.append(direction)
+
+    # Calculate percentage returns
+    if actual_openprice:  # Ensure the list is not empty
+        actual_openprice_series = pd.Series(actual_openprice)
+        fx_returns = actual_openprice_series.pct_change() * 100  # Percentage change
+
+    return renko_data, actual_openprice, renko_timestamps, ticks_moved, directions, fx_returns
+
+
 
 # Function to convert to tick-like data
-def convert_to_tick(csv_filepath, csv_filename, output_file_path, output_filename, brick_size):
+def convert_to_tick(csv_filepath, csv_filename, output_file_path, output_filename, brick_size, use_first_price_as_base):
 
     # Define the column names for the dataset
     column_names = ['datetime', 'open', 'high', 'low', 'close', 'volume']
@@ -97,8 +108,11 @@ def convert_to_tick(csv_filepath, csv_filename, output_file_path, output_filenam
         df.set_index('datetime', inplace=True)
         
         # Set your desired brick size
-        renko_bricks, actual_openprice, renko_timestamps, ticks_moved, directions, fx_returns = generate_renko(df, brick_size)
-
+        if use_first_price_as_base:
+            renko_bricks, actual_openprice, renko_timestamps, ticks_moved, directions, fx_returns = generate_renko_base_first_price(df, brick_size)
+        else:
+            renko_bricks, actual_openprice, renko_timestamps, ticks_moved, directions, fx_returns = generate_renko_base_prev_price(df, brick_size)
+        
         # Create a DataFrame with tick-like data
         tick_like_data = pd.DataFrame({
             'tick_number': range(1, len(renko_bricks) + 1),
