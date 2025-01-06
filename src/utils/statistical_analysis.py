@@ -1,10 +1,7 @@
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
-
-import pandas as pd
 import numpy as np
-import os
 
 def correlation_analysis_resample(target_filepath, feature_filepath, target_name, feature_name, year, output_filepath, resample_interval=None):
     column_names = ['datetime', 'open', 'high', 'low', 'close', 'volume']
