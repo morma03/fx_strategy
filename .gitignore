@@ -1,2 +1,4 @@
 fx_strategy_env/
 notebooks/data/
+notebooks/output
+src/utils/__pycache__/

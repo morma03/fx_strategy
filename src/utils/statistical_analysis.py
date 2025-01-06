@@ -2,6 +2,32 @@ import pandas as pd
 import os
 import matplotlib.pyplot as plt
 
+def correlation_analysis(target_filepath, feature_filepath, target_name, feature_name, year, output_filepath):
+    
+    column_names = ['datetime', 'open', 'high', 'low', 'close', 'volume']
+    feature_data = pd.read_csv(feature_filepath, names=column_names, header=None, delimiter=';', encoding='utf-8')
+    target_data = pd.read_csv(target_filepath, names=column_names, header=None, delimiter=';', encoding='utf-8')
+    
+    print(feature_data.head())
+    print(target_data.head())
+
+    feature_data['datetime'] = pd.to_datetime(feature_data['datetime'])
+    target_data['datetime'] = pd.to_datetime(feature_data['datetime'])
+
+    aligned_data = pd.merge(feature_data, target_data, on='datetime', suffixes=(f'_{feature_name}', f'_{target_name}'))
+    print(aligned_data.head())
+    aligned_data.to_csv(os.path.join(output_filepath, f'{year}_aligned_{feature_name}_{target_name}.csv'), index=False)
+    
+    aligned_data[f'return_{feature_name}'] = aligned_data[f'open_{feature_name}'].pct_change()
+    aligned_data[f'return_{target_name}'] = aligned_data[f'open_{target_name}'].pct_change()
+
+    aligned_data[f'return_{target_name}_t+1'] = aligned_data[f'return_{target_name}'].shift(-1)
+    aligned_data = aligned_data.dropna()
+
+    correlation = aligned_data[f'return_{feature_name}'].corr(aligned_data[f'return_{target_name}_t+1'])
+    print(correlation)
+    return 
+
 # Define a function for statistical analysis
 def statistical_analysis(df, session=None, day=None, result_file_path=None):
     """

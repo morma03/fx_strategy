@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 
-def generate_renko(data, brick_size):
+def generate_renko_org(data, brick_size):
     renko_data = []
     actual_openprice = []
     renko_timestamps = []
@@ -37,6 +37,47 @@ def generate_renko(data, brick_size):
     fx_returns = actual_openprice_series.pct_change() * 100  # Percentage change
     return renko_data, actual_openprice, renko_timestamps, ticks_moved, directions, fx_returns
 
+def generate_renko(data, brick_size):
+    # Initialize variables
+    renko_data = []
+    actual_openprice = []
+    renko_timestamps = []
+    ticks_moved = []  # To store the number of ticks moved per brick
+    directions = []
+    fx_returns = []
+
+    # Extract prices and timestamps
+    open_prices = data['open'].values
+    timestamps = data.index.values
+    current_price = open_prices[0]
+
+    for i in range(1, len(open_prices)):
+        price = open_prices[i]
+        timestamp = timestamps[i]
+
+        # Calculate price difference
+        price_diff = price - current_price
+        total_ticks = int(abs(price_diff) // brick_size)
+
+        # Only proceed if price difference is significant enough to form a brick
+        if total_ticks > 0:
+            for _ in range(total_ticks):
+                # Update current price in the direction of the move
+                current_price += brick_size if price_diff > 0 else -brick_size
+
+                # Append Renko brick details
+                renko_data.append(current_price)
+                actual_openprice.append(price)
+                renko_timestamps.append(timestamp)
+                ticks_moved.append(total_ticks)
+                directions.append("+1" if price_diff > 0 else "-1")
+
+    # Calculate percentage returns for the bricks
+    if actual_openprice:  # Ensure the list is not empty
+        actual_openprice_series = pd.Series(actual_openprice)
+        fx_returns = actual_openprice_series.pct_change() * 100  # Percentage change
+
+    return renko_data, actual_openprice, renko_timestamps, ticks_moved, directions, fx_returns
 
 
 # Function to convert to tick-like data
