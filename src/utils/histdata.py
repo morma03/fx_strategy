@@ -2,7 +2,7 @@ import histdatacom
 from histdatacom.options import Options
 from histdatacom.fx_enums import Pairs
 
-def import_pair_to_influx(pair, start, end, timeframes="1-minute-bar-quotes"):
+def import_pair(pair, start, end, timeframes="1-minute-bar-quotes", data_directory=None):
     data_options = Options()
 
     data_options.import_to_influxdb = False  # implies validate, download, and extract
@@ -14,9 +14,13 @@ def import_pair_to_influx(pair, start, end, timeframes="1-minute-bar-quotes"):
     data_options.start_yearmonth = f"{start}"
     data_options.end_yearmonth = f"{end}"
     data_options.formats = {"ascii"}  # Must be {"ascii"}
-    data_options.timeframes = timeframes # can be tick-data-quotes or 1-minute-bar-quotes
-    data_options.data_directory = "../../data/histdata"
-    histdatacom(data_options)
+    data_options.timeframes = {timeframes} # can be tick-data-quotes or 1-minute-bar-quotes
+    if data_directory:
+        data_options.data_directory = data_directory
+        
+    return histdatacom(data_options)
 
+# # if __name__ == '__main__':
+#     # import_pair_to_influx("usdjpy", "202301", "202312")
 # if __name__ == '__main__':
-    # import_pair_to_influx("usdjpy", "202301", "202312")
+#     import_pair("gbpusd", "202301", "202312")
