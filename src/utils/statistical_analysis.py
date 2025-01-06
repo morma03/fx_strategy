@@ -2,22 +2,49 @@ import pandas as pd
 import os
 import matplotlib.pyplot as plt
 
-def correlation_analysis(target_filepath, feature_filepath, target_name, feature_name, year, output_filepath):
-    
+import pandas as pd
+import numpy as np
+import os
+
+def correlation_analysis_resample(target_filepath, feature_filepath, target_name, feature_name, year, output_filepath, resample_interval=None):
     column_names = ['datetime', 'open', 'high', 'low', 'close', 'volume']
     feature_data = pd.read_csv(feature_filepath, names=column_names, header=None, delimiter=';', encoding='utf-8')
     target_data = pd.read_csv(target_filepath, names=column_names, header=None, delimiter=';', encoding='utf-8')
-    
+
     print(feature_data.head())
     print(target_data.head())
 
     feature_data['datetime'] = pd.to_datetime(feature_data['datetime'])
-    target_data['datetime'] = pd.to_datetime(feature_data['datetime'])
+    target_data['datetime'] = pd.to_datetime(target_data['datetime'])
+
+    # Resample the data if a resample interval is provided
+    if resample_interval:
+        feature_data.set_index('datetime', inplace=True)
+        target_data.set_index('datetime', inplace=True)
+
+        feature_data = feature_data.resample(resample_interval).agg({
+            'open': 'first',
+            'high': 'max',
+            'low': 'min',
+            'close': 'last',
+            'volume': 'sum'
+        }).dropna()
+
+        target_data = target_data.resample(resample_interval).agg({
+            'open': 'first',
+            'high': 'max',
+            'low': 'min',
+            'close': 'last',
+            'volume': 'sum'
+        }).dropna()
+
+        feature_data.reset_index(inplace=True)
+        target_data.reset_index(inplace=True)
 
     aligned_data = pd.merge(feature_data, target_data, on='datetime', suffixes=(f'_{feature_name}', f'_{target_name}'))
     print(aligned_data.head())
-    aligned_data.to_csv(os.path.join(output_filepath, f'{year}_aligned_{feature_name}_{target_name}.csv'), index=False)
-    
+    aligned_data.to_csv(os.path.join(output_filepath, f'{year}_aligned_{feature_name}_{target_name}_{resample_interval}.csv'), index=False)
+
     aligned_data[f'return_{feature_name}'] = aligned_data[f'open_{feature_name}'].pct_change()
     aligned_data[f'return_{target_name}'] = aligned_data[f'open_{target_name}'].pct_change()
 
@@ -26,7 +53,7 @@ def correlation_analysis(target_filepath, feature_filepath, target_name, feature
 
     correlation = aligned_data[f'return_{feature_name}'].corr(aligned_data[f'return_{target_name}_t+1'])
     print(correlation)
-    return 
+    return correlation
 
 # Define a function for statistical analysis
 def statistical_analysis(df, session=None, day=None, result_file_path=None):
