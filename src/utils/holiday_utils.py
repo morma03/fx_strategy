@@ -95,3 +95,13 @@ def add_holidays_to_fx_data(df, cleaned_file_path, year, country_codes):
     # Save the updated DataFrame back to the CSV file
     df.to_csv(cleaned_file_path, encoding='utf-8-sig')    
     return df
+
+def remove_friday(input_filepath, output_filepath):
+    data = pd.read_csv(input_filepath)
+
+    # Filter out rows where 'day_of_week' is 'Friday'
+    filtered_data = data[data['day_of_week'] != 'Friday']
+    filtered_data.to_csv(output_filepath, index=False)
+
+    print("Rows with 'Friday' in the 'day_of_week' column have been removed.")
+    print(f"Filtered data saved to: {output_filepath}")
