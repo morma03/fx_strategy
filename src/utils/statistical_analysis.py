@@ -91,7 +91,7 @@ def statistical_analysis(df, session=None, day=None, result_file_path=None):
 
     # Filter by trading session if specified
     if session:
-        df = filter_by_session(df, session)
+        df = filter_by_session_nyc(df, session)
 
     # Calculate basic statistics (mean, std, etc.)
     stats = pd.DataFrame({
@@ -140,43 +140,85 @@ def statistical_analysis(df, session=None, day=None, result_file_path=None):
 
     return stats, df
 
-# Helper function to filter by trading session
-def filter_by_session(df, session):
+def filter_by_session_nyc(df, session, output_file=None):
     """
-    Filters the DataFrame by the given trading session or sub-session.
+    Filters the DataFrame by the given trading session or sub-session using NYC time as a base.
    
-    Trading session/sub-session times (UTC):
-    - Asian: 00:00 - 09:00
-    - Asian Morning: 00:00 - 06:00
-    - London: 08:00 - 17:00
-    - London Morning: 08:00 - 12:00
-    - London Afternoon: 12:00 - 17:00
-    - NY: 13:00 - 22:00
-    - NY Morning: 13:00 - 17:00
-    - NY Evening: 17:00 - 22:00
+    Trading session/sub-session times (NYC time):
+    - asian: 19:00 (prev day) - 04:00
+    - asian_morning: 19:00 (prev day) - 01:00
+    - london: 03:00 - 12:00
+    - london_morning: 03:00 - 07:00
+    - london_afternoon: 07:00 - 12:00
+    - ny: 08:00 - 17:00
+    - ny_morning: 08:00 - 12:00
+    - ny_evening: 12:00 - 17:00
    
     Parameters:
-        df (DataFrame): The input time series DataFrame.
-        session (str): The trading session or sub-session ('Asian', 'London Morning', etc.).
+        df (DataFrame): The input time series DataFrame (with NYC timezone-aware timestamps).
+        session (str): The trading session or sub-session ('asian', 'london_morning', etc.).
+        output_file (str): Path to save the filtered DataFrame as a CSV file. If None, no file is saved.
 
     Returns:
         DataFrame: Filtered DataFrame for the session.
     """
-    if session == 'Asian':
-        return df.between_time('00:00', '09:00')
-    elif session == 'Asian Morning':
-        return df.between_time('00:00', '06:00')
-    elif session == 'London':
-        return df.between_time('08:00', '17:00')
-    elif session == 'London Morning':
-        return df.between_time('08:00', '12:00')
-    elif session == 'London Afternoon':
-        return df.between_time('12:00', '17:00')
-    elif session == 'NY':
-        return df.between_time('13:00', '22:00')
-    elif session == 'NY Morning':
-        return df.between_time('13:00', '17:00')
-    elif session == 'NY Evening':
-        return df.between_time('17:00', '22:00')
-    else:
-        raise ValueError("Invalid session. Choose from 'Asian', 'Asian Morning', 'London', 'London Morning', 'London Afternoon', 'NY', 'NY Morning', or 'NY Evening'.")
+    print(f"Function called with session: {session}", flush=True)
+
+    # Define session times
+    session_times = {
+        'asian': ('19:00', '04:00'),
+        'asian_morning': ('19:00', '01:00'),
+        'london': ('03:00', '12:00'),
+        'london_morning': ('03:00', '07:00'),
+        'london_afternoon': ('07:00', '12:00'),
+        'ny': ('08:00', '17:00'),
+        'ny_morning': ('08:00', '12:00'),
+        'ny_evening': ('12:00', '17:00')
+    }
+
+    # Validate session input
+    if session not in session_times:
+        raise ValueError("Invalid session. Choose from the predefined sessions.")
+
+    start_time, end_time = session_times[session]
+
+    try:
+        # Special handling for sessions crossing midnight
+        if session in ['asian', 'asian_morning']:
+            # Debug: After start time
+            print(f"Filtering rows after start time {start_time}...", flush=True)
+            after_start = df.between_time(start_time, '23:59:59')
+            if after_start.empty:
+                print(f"No rows found after {start_time}.", flush=True)
+            else:
+                print(f"Rows after {start_time}:\n{after_start}", flush=True)
+
+            # Debug: Before end time
+            print(f"Filtering rows before end time {end_time}...", flush=True)
+            before_end = df.between_time('00:00', end_time)
+            if before_end.empty:
+                print(f"No rows found before {end_time}.", flush=True)
+            else:
+                print(f"Rows before {end_time}:\n{before_end}", flush=True)
+
+            # Combine the two
+            print("Combining rows...", flush=True)
+            filtered = pd.concat([after_start, before_end])
+            print(f"Combined rows:\n{filtered}", flush=True)
+        else:
+            # General case for sessions not crossing midnight
+            print(f"Filtering rows for {session} ({start_time} to {end_time})...", flush=True)
+            filtered = df.between_time(start_time, end_time)
+            filtered = filtered[filtered.index.time < pd.Timestamp(end_time).time()]
+            print(f"Filtered rows:\n{filtered}", flush=True)
+
+        # Save to CSV if requested
+        if output_file:
+            filtered.to_csv(output_file)
+            print(f"Filtered data saved to {output_file}", flush=True)
+
+        return filtered
+
+    except Exception as e:
+        print(f"An error occurred: {e}", flush=True)
+        return None
