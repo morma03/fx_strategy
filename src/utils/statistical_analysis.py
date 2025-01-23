@@ -140,12 +140,6 @@ def statistical_analysis(df, session=None, day=None, result_file_path=None):
 
     return stats, df
 
-import pandas as pd
-
-import pandas as pd
-
-import pandas as pd
-
 def filter_by_session_nyc(df, session, output_file=None):
     """
     Filters the DataFrame by the given trading session or sub-session using NYC time as a base.
@@ -170,6 +164,10 @@ def filter_by_session_nyc(df, session, output_file=None):
     """
     print(f"Filtering session: {session}")
 
+    df["datetime"] = pd.to_datetime(df["datetime"])
+    df.set_index("datetime", inplace=True)
+    df.index = df.index.tz_localize('America/New_York')
+
     # Define session times
     session_times = {
         'asian': ('19:00', '04:00'),
@@ -189,33 +187,38 @@ def filter_by_session_nyc(df, session, output_file=None):
 
     # Initialize empty DataFrame
     filtered = pd.DataFrame()
+    
+    if session in ['asian', 'asian_morning']:
+        try:
+            # Split the DataFrame by date for precision
+            df['date'] = df.index.date
+            df['time'] = df.index.time
 
-    try:
-        # Split the DataFrame by date for precision
-        df['date'] = df.index.date
-        df['time'] = df.index.time
+            print("Filtering previous day's rows...")
+            prev_day_filter = (df['time'] >= pd.Timestamp(start_time).time())
+            prev_day_rows = df[prev_day_filter]
+            print(f"Previous day rows:\n{prev_day_rows}")
 
-        print("Filtering previous day's rows...")
-        prev_day_filter = (df['time'] >= pd.Timestamp(start_time).time())
-        prev_day_rows = df[prev_day_filter]
-        print(f"Previous day rows:\n{prev_day_rows}")
+            print("Filtering next day's rows...")
+            next_day_filter = (df['time'] < pd.Timestamp(end_time).time())
+            next_day_rows = df[next_day_filter]
+            print(f"Next day rows:\n{next_day_rows}")
 
-        print("Filtering next day's rows...")
-        next_day_filter = (df['time'] < pd.Timestamp(end_time).time())
-        next_day_rows = df[next_day_filter]
-        print(f"Next day rows:\n{next_day_rows}")
+            # Combine the results
+            print("Combining results...")
+            filtered = pd.concat([prev_day_rows, next_day_rows]).sort_index()
+            print(f"Filtered DataFrame:\n{filtered}")
 
-        # Combine the results
-        print("Combining results...")
-        filtered = pd.concat([prev_day_rows, next_day_rows]).sort_index()
-        print(f"Filtered DataFrame:\n{filtered}")
+        except Exception as e:
+            print(f"Error during filtering: {e}")
+    else:
+        filtered = df.between_time(start_time, end_time)
+        filtered = filtered[filtered.index.time < pd.Timestamp(end_time).time()]
+        print(f"Filtered rows for {session}:\n{filtered}", flush=True)
+    
+    if output_file:
+        filtered.to_csv(output_file)
+        print(f"Filtered data saved to {output_file}")
 
-        # Save to CSV if needed
-        if output_file:
-            filtered.to_csv(output_file)
-            print(f"Filtered data saved to {output_file}")
-
-    except Exception as e:
-        print(f"Error during filtering: {e}")
 
     return filtered
