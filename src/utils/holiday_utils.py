@@ -105,3 +105,13 @@ def remove_friday(input_filepath, output_filepath):
 
     print("Rows with 'Friday' in the 'day_of_week' column have been removed.")
     print(f"Filtered data saved to: {output_filepath}")
+
+def extract_weekday(input_filepath, output_filepath, weekday):
+    data = pd.read_csv(input_filepath)
+
+    # Filter out rows where 'day_of_week' matches the specified weekday
+    filtered_data = data[data['day_of_week'] == weekday]
+    filtered_data.to_csv(output_filepath, index=False)
+
+    print(f"Rows with '{weekday}' in the 'day_of_week' column have been extracted.")
+    print(f"Filtered data saved to: {output_filepath}")
