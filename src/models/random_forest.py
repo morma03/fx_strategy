@@ -9,7 +9,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 import matplotlib.pyplot as plt
 
-def random_forrest_session(df, year, ccy, session, model_output_filepath):
+def random_forest_session(df, year, ccy, session, model_output_filepath):
     # Ensure 'datetime' column is in datetime format
     df['datetime'] = pd.to_datetime(df['datetime'], errors='raise')
     # Keep a copy of the 'datetime' column before setting it as the index
@@ -112,6 +112,9 @@ def random_forrest_session(df, year, ccy, session, model_output_filepath):
     )
     # Save the results DataFrame to CSV
     results_df.to_csv(rf'{model_output_filepath}/{year}_{ccy}_{session}_random_forest_results.csv', index=False)
+    df.to_csv(rf'{model_output_filepath}/{year}_{ccy}_{session}_random_forest_dataframe.csv')
+    print(f"Model output saved to {model_output_filepath}")
+    
     print(backtest_data.columns)
 
     return backtest_data, X_backtest, y_backtest, y_pred_backtest
@@ -141,22 +144,15 @@ def run_backtest(model_output_filepath, year, ccy, session, df, X_test, y_test, 
         actual = y_test.iloc[i]
         predicted = y_pred[i]
         price = df.iloc[len(df) - len(X_test) + i]['price']  # Match test index to df
-        
-        """
-        # Simulate a trade based on predicted direction
-        if predicted == 1:  # Buy signal
-            trade_profit = (price * 0.0001 * lot_size) if actual == 1 else -(price * 0.0001 * lot_size)
-        else:  # Sell signal
-            trade_profit = -(price * 0.0001 * lot_size) if actual == 1 else (price * 0.0001 * lot_size)
-        """
+
         # Simulate a trade based on predicted direction: previous balance + direction * lot_size * fx_return
         fx_return = df.iloc[len(df) - len(X_test) + i]['fx_return']  # Match test index to df
 
         # Simulate a trade based on predicted direction
         if predicted == 1:  # Buy signal
-            trade_profit = fx_return * lot_size if actual == 1 else -fx_return * lot_size
+            trade_profit = fx_return * lot_size
         else:  # Sell signal
-            trade_profit = -fx_return * lot_size if actual == 1 else fx_return * lot_size
+            trade_profit = -fx_return * lot_size
 
         # Update balance
         balance += trade_profit
@@ -167,6 +163,7 @@ def run_backtest(model_output_filepath, year, ccy, session, df, X_test, y_test, 
             'tick': df.iloc[len(df) - len(X_test) + i]['tick_number'],
             'datetime': df.iloc[len(df) - len(X_test) + i]['datetime_original'],
             'price': price,
+            'actual_open_price': df.iloc[len(df) - len(X_test) + i]['actual_openprice'],
             'predicted': predicted,
             'actual': actual,
             'fx_return':fx_return,
