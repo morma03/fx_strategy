@@ -1,5 +1,7 @@
 import pandas as pd
 import os
+import re
+import glob
 
 def generate_renko_base_first_price(data, brick_size):
     # Initialize variables
@@ -151,3 +153,64 @@ def convert_to_tick(csv_filepath, output_file_path, output_filename, brick_size,
     
     return tick_like_data
 
+def create_summary(data_dir, result_file):
+
+    filename_pattern = re.compile(
+        rf"(\d{{4}})_([a-zA-Z]{{6}})_(\w+(?:_\w+)*)_({result_file}|backtesting)\.csv"
+    )
+
+    summary_data = {}    
+    csv_files = glob.glob(os.path.join(data_dir, "*.csv"))
+
+    print("Files found:", csv_files)
+    for filepath in csv_files:
+        filename = os.path.basename(filepath)
+        print("Checking:", filename)
+
+        match = filename_pattern.match(filename)
+        if not match:
+            print("  --> Regex did NOT match. Skipping.")
+            continue
+
+        year, ccy, session, file_type = match.groups()
+        print(f"  --> Regex matched: year={year}, ccy={ccy}, session={session}, file_type={file_type}")
+        key = (year, ccy, session)
+
+        if key not in summary_data:
+            summary_data[key] = {
+                "year": year,
+                "ccy": ccy,
+                "session": session,
+                "accuracy": None,
+                "backtest_start": None,
+                "backtest_end": None,
+                "closing_balance": None
+            }
+        
+        df = pd.read_csv(filepath)
+        print("  --> DataFrame columns:", df.columns.tolist())
+
+        if file_type == result_file:
+            # Make sure "Accuracy" actually exists in df.columns
+            print("Columns are:", df.columns.tolist())
+            if "Accuracy" in df.columns:
+                summary_data[key]["accuracy"] = df["Accuracy"].iloc[0]
+            else:
+             print("No 'Accuracy' column found! Found these columns:", df.columns.tolist())
+            # Possibly skip or store None
+
+        else:  # backtesting
+            # Make sure "datetime" and "balance" exist in df.columns
+            summary_data[key]["backtest_start"] = df["datetime"].iloc[0]
+            summary_data[key]["backtest_end"]   = df["datetime"].iloc[-1]
+            summary_data[key]["closing_balance"] = df["balance"].iloc[-1]
+
+    # After the loop, see what we collected
+    print("\nSummary so far:")
+    for k, v in summary_data.items():
+        print(k, "->", v)
+
+    output_df = pd.DataFrame(summary_data.values())
+    output_file = os.path.join(data_dir, "final_summary.csv")
+    output_df.to_csv(output_file, index=False)
+    print("Final summary saved to:", output_file)
